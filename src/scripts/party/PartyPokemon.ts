@@ -248,6 +248,10 @@ class PartyPokemon implements Saveable {
             return;
         }
 
+        if (amount <= 0) {
+            return;
+        }
+
         const usesRemaining = this.vitaminUsesRemaining();
 
         // If no more vitamins can be used on this Pokemon
@@ -290,6 +294,99 @@ class PartyPokemon implements Saveable {
 
         GameHelper.incrementObservable(this.vitaminsUsed[vitamin], -amount);
         GameHelper.incrementObservable(player.itemList[vitaminName], amount);
+    }
+
+    public removeAllVitamins(): void {
+        const vitamins = GameHelper.enumNumbers(GameConstants.VitaminType);
+        vitamins.forEach((v) => {
+            if (this.vitaminsUsed[v]() > 0) {
+                this.removeVitamin(v, Infinity);
+            }
+        });
+    }
+
+    public autoVitamins(): void {
+        const bv = this.getBestVitamins();
+        if (App.game.challenges.list.disableVitamins.active()) {
+            Notifier.notify({
+                title: 'Challenge Mode',
+                message: 'Vitamins are disabled',
+                type: NotificationConstants.NotificationOption.danger,
+            });
+            return;
+        } else {
+            Notifier.notify({
+                title: 'Test',
+                message: `${bv["calcium"]} You good, thats for ${this.displayName} `,
+                type: NotificationConstants.NotificationOption.success,
+            });
+        }
+
+        if (this.breeding) {
+            Notifier.notify({
+                message: 'Vitamins cannot be modified for Pokémon in the hatchery or queue.',
+                type: NotificationConstants.NotificationOption.warning,
+            });
+            return;
+        }
+
+        //Remove all vitamins from pokemon
+        this.removeAllVitamins();
+        //Attempt to add proper amount
+        const vitamins = GameHelper.enumNumbers(GameConstants.VitaminType);
+        vitamins.forEach((v) => {
+            this.useVitamin(v, bv[GameConstants.VitaminType[v].toLowerCase()]);
+        });
+
+    }
+
+    public calcBreedingAttackBonus(vitaminsUsed): number {
+        const attackBonusPercent = (GameConstants.BREEDING_ATTACK_BONUS + vitaminsUsed[GameConstants.VitaminType.Calcium]) / 100;
+        const proteinBoost = vitaminsUsed[GameConstants.VitaminType.Protein];
+        return (this.baseAttack * attackBonusPercent) + proteinBoost;
+    }
+
+    public calcEggSteps(vitaminsUsed): number {
+        const div = 300;
+        const extraCycles = (vitaminsUsed[GameConstants.VitaminType.Calcium] + vitaminsUsed[GameConstants.VitaminType.Protein]) / 2;
+        const steps = (this.eggCycles + extraCycles) * GameConstants.EGG_CYCLE_MULTIPLIER;
+        return steps <= div ? steps : Math.round(((steps / div) ** (1 - vitaminsUsed[GameConstants.VitaminType.Carbos] / 70)) * div);
+    }
+
+    public getEfficiency(vitaminsUsed): number {
+        return (this.calcBreedingAttackBonus(vitaminsUsed) / this.calcEggSteps(vitaminsUsed)) * GameConstants.EGG_CYCLE_MULTIPLIER;
+    }
+
+    public getBestVitamins(): Record<string, number> {
+        let res = {
+            protein: 0,
+            calcium: 0,
+            carbos: 0,
+            eff: this.getEfficiency([0,0,0]),
+        };
+        let totalVitamins = (player.highestRegion() + 1) * 5;
+        // Unlocked at Unova
+        let carbos = (player.highestRegion() >= GameConstants.Region.unova ? totalVitamins : 0) + 1;
+        while (carbos-- > 0) {
+            // Unlocked at Hoenn
+            let calcium = (player.highestRegion() >= GameConstants.Region.hoenn ? totalVitamins - carbos: 0) + 1;
+            while (calcium-- > 0) {
+                let protein = (totalVitamins - (carbos + calcium)) + 1;
+                while (protein-- > 0) {
+                    const eff = this.getEfficiency([protein, calcium, carbos]);
+                    // If the previous result is better than this, no point to continue
+                    if (eff < res.eff) break;
+                    // Push our data if same or better
+                    res = {
+                        protein,
+                        calcium,
+                        carbos,
+                        eff,
+                    };
+                }
+            }
+        }
+        return res;
     }
 
     public useConsumable(type: GameConstants.ConsumableType, amount: number): void {
