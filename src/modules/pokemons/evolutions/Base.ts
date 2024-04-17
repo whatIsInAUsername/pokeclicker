@@ -1,4 +1,5 @@
-import { StoneType } from '../../GameConstants';
+import { AchievementOption, StoneType } from '../../GameConstants';
+import HoldingItemRequirement from '../../requirements/HoldingItemRequirement';
 import LazyRequirementWrapper from '../../requirements/LazyRequirementWrapper';
 import MaxRegionRequirement from '../../requirements/MaxRegionRequirement';
 import ObtainedPokemonRequirement from '../../requirements/ObtainedPokemonRequirement';
@@ -18,6 +19,7 @@ export interface EvoData {
     evolvedPokemon: PokemonNameType;
     trigger: EvoTrigger;
     restrictions: Array<Requirement>;
+    ignoreECChange: boolean;
 }
 
 export interface DummyEvoData extends EvoData {
@@ -34,7 +36,7 @@ export const beforeEvolve: Partial<Record<EvoTrigger, (data: EvoData) => boolean
     [EvoTrigger.LEVEL]: () => true,
 };
 
-export const Evo = (basePokemon: PokemonNameType, evolvedPokemon: PokemonNameType, trigger: EvoTrigger): EvoData => ({
+export const Evo = (basePokemon: PokemonNameType, evolvedPokemon: PokemonNameType, trigger: EvoTrigger, ignoreECChange): EvoData => ({
     basePokemon,
     evolvedPokemon,
     trigger,
@@ -47,6 +49,7 @@ export const Evo = (basePokemon: PokemonNameType, evolvedPokemon: PokemonNameTyp
             () => new MaxRegionRequirement(calcNativeRegion(evolvedPokemon)),
         ),
     ],
+    ignoreECChange,
 });
 
 export const restrict = <T extends EvoData>(evo: T, ...restrictions: EvoData['restrictions']): T => {
@@ -55,16 +58,17 @@ export const restrict = <T extends EvoData>(evo: T, ...restrictions: EvoData['re
 };
 
 export const DummyEvolution = (basePokemon: PokemonNameType, evolvedPokemon: PokemonNameType): DummyEvoData => ({
-    ...Evo(basePokemon, evolvedPokemon, EvoTrigger.NONE),
+    ...Evo(basePokemon, evolvedPokemon, EvoTrigger.NONE, false),
 });
 
-export const LevelEvolution = (basePokemon: PokemonNameType, evolvedPokemon: PokemonNameType, level: number): LevelEvoData => restrict(
-    { ...Evo(basePokemon, evolvedPokemon, EvoTrigger.LEVEL) },
+export const LevelEvolution = (basePokemon: PokemonNameType, evolvedPokemon: PokemonNameType, level: number, ignoreECChange = false): LevelEvoData => restrict(
+    { ...Evo(basePokemon, evolvedPokemon, EvoTrigger.LEVEL, ignoreECChange) },
     new PokemonLevelRequirement(basePokemon, level),
     new ObtainedPokemonRequirement(evolvedPokemon, true),
+    new HoldingItemRequirement(basePokemon, 'Everstone', AchievementOption.less),
 );
 
-export const StoneEvolution = (basePokemon: PokemonNameType, evolvedPokemon: PokemonNameType, stone: StoneType): StoneEvoData => ({
-    ...Evo(basePokemon, evolvedPokemon, EvoTrigger.STONE),
-    stone,
-});
+export const StoneEvolution = (basePokemon: PokemonNameType, evolvedPokemon: PokemonNameType, stone: StoneType, ignoreECChange = false): StoneEvoData => restrict(
+    { ...Evo(basePokemon, evolvedPokemon, EvoTrigger.STONE, ignoreECChange), stone },
+    new HoldingItemRequirement(basePokemon, 'Everstone', AchievementOption.less),
+);

@@ -1,6 +1,7 @@
 import { AchievementOption } from '../GameConstants';
 import SeededRand from '../utilities/SeededRand';
 import Requirement from './Requirement';
+import GameHelper from '../GameHelper';
 
 export default class SeededDateSelectNRequirement extends Requirement {
     constructor(private index: number, private total: number, private select: number) {
@@ -8,10 +9,10 @@ export default class SeededDateSelectNRequirement extends Requirement {
     }
 
     public getProgress(): number {
-        SeededRand.seedWithDate(new Date());
-        const numbersSelected = SeededRand.shuffleArray([...Array(this.total).keys()].map(i => i.toString())).slice(0, this.select).map(s => parseInt(s));
+        SeededRand.seedWithDate(GameHelper.today());
+        const numbersSelected = SeededRand.shuffleArray([...Array(this.total).keys()]).slice(0, this.select);
 
-        return +(this.index in numbersSelected);
+        return +numbersSelected.includes(this.index);
     }
 
     // eslint-disable-next-line class-methods-use-this
