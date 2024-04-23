@@ -89,7 +89,9 @@
                         <thead>
                             <tr>
                                 <th class="align-middle">Pokémon</th>
-                                <th class="align-middle">Auto</th>
+                                <th class="align-middle">
+                                    Optimize Vitamins?
+                                </th>
                                 <th class="text-center align-middle">Vitamins Used</th>
                                 <!-- ko foreach: GameHelper.enumStrings(GameConstants.VitaminType) -->
                                 <th class="text-center align-middle">
@@ -104,17 +106,32 @@
                         </thead>
                         <tbody data-bind="foreach: lazyLoad($element, PartyController.getvitaminSortedList, { reset: modalUtils.observableState.pokemonVitaminExpandedModalObservable })">
                             <tr data-bind="css: { 'text-muted': $data.breeding }">
+
+                                <!-- Pokemon Column -->
                                 <td class="text-left align-middle">
                                     <knockout data-bind="text: $data.displayName"></knockout>
                                     <sup data-bind="visible: $data.shiny">✨</sup>
                                 </td>
-                                <td class="text-center align-middle tight">
+
+                                <!-- Optimize Vitamins Column -->
+                                <td class="text-center align-middle tight" style="text-align: center;border: 1px solid red;">
+                                    <!-- <div class="form-check form-check-inline text-center align-middle"> -->
+                                    <input type="checkbox" id="optimize-pokemon-upon-hatchery" class="form-check-input" data-bind="checked: $data.optimizeVitaminsOnEgg" onchange="toggleOptimizeVitaminsOnEgg()"/>
+                                    <!-- </div> -->
+                                </td>
+
+                                <!-- Optimize Now Column -->
+                                <!-- <td class="text-center align-middle tight">
                                     <button type="button" class="btn btn-link btn-sm text-decoration-none align-text-top" style="line-height: 0.6; font-size: 1rem;"
                                         data-bind="
                                             click: () => { $data.autoVitamins() },
-                                            class: (!$data.breeding ? 'text-success' : 'text-muted')">🦾</button>
-                                </td>
+                                            class: (!$data.breeding && $data.optimizeVitaminsOnEgg ? 'text-success' : 'text-muted')">🦾</button>
+                                </td> -->
+
+                                <!-- Vitamins Used Column -->
                                 <td class="text-center align-middle tight" data-bind="text: $data.totalVitaminsUsed().toLocaleString('en-US')"></td>
+
+                                <!-- Individual Vitamin Columns -->
                                 <!-- ko foreach: GameHelper.enumNumbers(GameConstants.VitaminType) -->
                                 <td class="text-center align-middle tight">
                                     <button type="button" class="btn btn-link btn-sm text-decoration-none align-text-top" style="line-height: 0.6; font-size: 1rem;"
@@ -128,8 +145,14 @@
                                             class: ($parent.vitaminUsesRemaining() && player.itemList[GameConstants.VitaminType[$data]]() && !$parent.breeding ? 'text-success' : 'text-muted')">+</button>
                                 </td>
                                 <!-- /ko -->
+
+                                <!-- Breeding Efficiency Column -->
                                 <td class="text-center align-middle tight" data-bind="text: SortOptionConfigs[SortOptions.breedingEfficiency].getValue($data).toLocaleString('en-US', { maximumSignificantDigits: 2 })">-</td>
+
+                                <!-- Attack Bonus Column -->
                                 <td class="text-center align-middle tight" data-bind="text: $data.getBreedingAttackBonus().toLocaleString('en-US')">-</td>
+
+                                <!-- Egg Steps Column -->
                                 <td class="text-center align-middle tight" data-bind="text: $data.getEggSteps().toLocaleString('en-US')">-</td>
                             </tr>
                         </tbody>

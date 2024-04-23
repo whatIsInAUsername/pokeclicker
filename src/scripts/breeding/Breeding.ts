@@ -342,7 +342,7 @@ class Breeding implements Feature {
             return false;
         }
 
-        if (pokemon instanceof PartyPokemon) {
+        if (pokemon instanceof PartyPokemon && pokemon.optimizeVitaminsOnEgg) {
             pokemon.autoVitamins();
         }
 
