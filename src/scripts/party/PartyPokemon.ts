@@ -15,6 +15,7 @@ enum PartyPokemonSaveKeys {
     nickname,
     shadow,
     showShadowImage,
+    optimizeVitaminsOnEgg,
 }
 
 class PartyPokemon implements Saveable {
@@ -40,6 +41,7 @@ class PartyPokemon implements Saveable {
         nickname: '',
         shadow: GameConstants.ShadowStatus.None,
         showShadowImage: false,
+        optimizeVitaminsOnEgg: false,
     };
 
     // Saveable observables
@@ -61,6 +63,7 @@ class PartyPokemon implements Saveable {
     hideShinyImage: KnockoutObservable<boolean>;
     _shadow: KnockoutObservable<GameConstants.ShadowStatus>;
     _showShadowImage: KnockoutObservable<boolean>;
+    _optimizeVitaminsOnEgg: KnockoutObservable<boolean>;
 
     constructor(
         public id: number,
@@ -113,6 +116,7 @@ class PartyPokemon implements Saveable {
         this._displayName = ko.pureComputed(() => this._nickname() ? this._nickname() : this._translatedName());
         this._shadow = ko.observable(shadow);
         this._showShadowImage = ko.observable(false);
+        this._optimizeVitaminsOnEgg = ko.observable(false);
         this._attack = ko.computed(() => this.calculateAttack());
         this._canUseHeldItem = ko.pureComputed(() => this.heldItem()?.canUse(this));
         this._canUseHeldItem.subscribe((canUse) => {
@@ -313,6 +317,99 @@ class PartyPokemon implements Saveable {
 
         GameHelper.incrementObservable(this.vitaminsUsed[vitamin], -amount);
         GameHelper.incrementObservable(player.itemList[vitaminName], amount);
+    }
+
+    public removeAllVitamins(): void {
+        const vitamins = GameHelper.enumNumbers(GameConstants.VitaminType);
+        vitamins.forEach((v) => {
+            if (this.vitaminsUsed[v]() > 0) {
+                this.removeVitamin(v, Infinity);
+            }
+        });
+    }
+
+    public optimizeVitamins(): void {
+        const bv = this.getBestVitamins();
+        if (App.game.challenges.list.disableVitamins.active()) {
+            Notifier.notify({
+                title: 'Challenge Mode',
+                message: 'Vitamins are disabled',
+                type: NotificationConstants.NotificationOption.danger,
+            });
+            return;
+        }
+
+        if (this.breeding) {
+            Notifier.notify({
+                message: 'Vitamins cannot be modified for Pokémon in the hatchery or queue.',
+                type: NotificationConstants.NotificationOption.warning,
+            });
+            return;
+        }
+
+        //Remove all vitamins from pokemon
+        this.removeAllVitamins();
+        //Attempt to add proper amount
+        const vitamins = GameHelper.enumNumbers(GameConstants.VitaminType);
+        vitamins.forEach((v) => {
+            this.useVitamin(v, bv[GameConstants.VitaminType[v].toLowerCase()]);
+        });
+
+    }
+
+    public toggleOptimizeVitaminsOnEgg(): void {
+        this.optimizeVitaminsOnEgg = !this.optimizeVitaminsOnEgg;
+    }
+
+    public calcBreedingAttackBonus(vitaminsUsed): number {
+        const attackBonusPercent = (GameConstants.BREEDING_ATTACK_BONUS + vitaminsUsed[GameConstants.VitaminType.Calcium]) / 100;
+        const proteinBoost = vitaminsUsed[GameConstants.VitaminType.Protein];
+        return (this.baseAttack * attackBonusPercent) + proteinBoost;
+    }
+
+    public calcEggSteps(vitaminsUsed): number {
+        const div = 300;
+        const extraCycles = (vitaminsUsed[GameConstants.VitaminType.Calcium] + vitaminsUsed[GameConstants.VitaminType.Protein]) / 2;
+        const steps = (this.eggCycles + extraCycles) * GameConstants.EGG_CYCLE_MULTIPLIER;
+        return steps <= div ? steps : Math.round(((steps / div) ** (1 - vitaminsUsed[GameConstants.VitaminType.Carbos] / 70)) * div);
+    }
+
+    public getEfficiency(vitaminsUsed): number {
+        return (this.calcBreedingAttackBonus(vitaminsUsed) / this.calcEggSteps(vitaminsUsed)) * GameConstants.EGG_CYCLE_MULTIPLIER;
+    }
+
+    public getBestVitamins(): Record<string, number> {
+        let res = {
+            protein: 0,
+            calcium: 0,
+            carbos: 0,
+            eff: this.getEfficiency([0,0,0]),
+        };
+        const totalVitamins = (player.highestRegion() + 1) * 5;
+        // Unlocked at Unova
+        let carbos = (player.highestRegion() >= GameConstants.Region.unova ? totalVitamins : 0) + 1;
+        while (carbos-- > 0) {
+            // Unlocked at Hoenn
+            let calcium = (player.highestRegion() >= GameConstants.Region.hoenn ? totalVitamins - carbos : 0) + 1;
+            while (calcium-- > 0) {
+                let protein = (totalVitamins - (carbos + calcium)) + 1;
+                while (protein-- > 0) {
+                    const eff = this.getEfficiency([protein, calcium, carbos]);
+                    // If the previous result is better than this, no point to continue
+                    if (eff < res.eff) {
+                        break;
+                    }
+                    // Push our data if same or better
+                    res = {
+                        protein,
+                        calcium,
+                        carbos,
+                        eff,
+                    };
+                }
+            }
+        }
+        return res;
     }
 
     public useConsumable(type: GameConstants.ConsumableType, amount: number): void {
@@ -595,6 +692,8 @@ class PartyPokemon implements Saveable {
         this._nickname(json[PartyPokemonSaveKeys.nickname] || this.defaults.nickname);
         this.shadow = json[PartyPokemonSaveKeys.shadow] ?? this.defaults.shadow;
         this._showShadowImage(json[PartyPokemonSaveKeys.showShadowImage] ?? this.defaults.showShadowImage);
+        this._optimizeVitaminsOnEgg(json[PartyPokemonSaveKeys.optimizeVitaminsOnEgg] ?? this.defaults.optimizeVitaminsOnEgg);
+
     }
 
     public toJSON() {
@@ -615,6 +714,7 @@ class PartyPokemon implements Saveable {
             [PartyPokemonSaveKeys.nickname]: this.nickname || undefined,
             [PartyPokemonSaveKeys.shadow]: this.shadow,
             [PartyPokemonSaveKeys.showShadowImage]: this._showShadowImage(),
+            [PartyPokemonSaveKeys.optimizeVitaminsOnEgg]: this._optimizeVitaminsOnEgg(),
         };
 
         // Don't save anything that is the default option
@@ -722,5 +822,13 @@ class PartyPokemon implements Saveable {
 
     set showShadowImage(value: boolean) {
         this._showShadowImage(value);
+    }
+
+    get optimizeVitaminsOnEgg(): boolean {
+        return this._optimizeVitaminsOnEgg();
+    }
+
+    set optimizeVitaminsOnEgg(value: boolean) {
+        this._optimizeVitaminsOnEgg(value);
     }
 }

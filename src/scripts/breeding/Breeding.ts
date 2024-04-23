@@ -342,6 +342,10 @@ class Breeding implements Feature {
             return false;
         }
 
+        if (pokemon instanceof PartyPokemon && pokemon.optimizeVitaminsOnEgg) {
+            pokemon.optimizeVitamins();
+        }
+
         const egg = this.createEgg(pokemon.id);
         const success = this.gainEgg(egg, eggSlot);
 
