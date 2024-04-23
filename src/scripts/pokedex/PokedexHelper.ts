@@ -1,8 +1,22 @@
 import TypeColor = GameConstants.TypeColor;
 
 class PokedexHelper {
-    public static toggleStatisticShiny = ko.observable(true);
-    public static hideShinyImages = ko.observable(false);
+
+    public static initialize() {
+        Object.values(PokedexFilters).forEach((filter) => {
+            filter.value.subscribe(() => {
+                PokedexHelper.scrollToTop();
+                PokedexHelper.resetPokedexFlag.notifySubscribers();
+            });
+        });
+
+        modalUtils.observableState.pokedexModalObservable.subscribe((modalState) => {
+            // Resetting scrolling only works before modal is fully hidden
+            if (modalState === 'hide') {
+                PokedexHelper.scrollToTop();
+            }
+        });
+    }
 
     public static getBackgroundColors(name: PokemonNameType): string {
         const pokemon = PokemonHelper.getPokemonByName(name);
@@ -65,6 +79,8 @@ class PokedexHelper {
             // Checks based on caught/shiny status
             const alreadyCaught = App.game.party.alreadyCaughtPokemon(pokemon.id);
             const alreadyCaughtShiny = App.game.party.alreadyCaughtPokemon(pokemon.id, true);
+            const alreadyCaughtShadow = App.game.party.alreadyCaughtPokemon(pokemon.id, false, true);
+            const alreadyCaughtPurified = App.game.party.alreadyCaughtPokemon(pokemon.id, false, true, true);
 
             // If the Pokemon shouldn't be unlocked yet
             const nativeRegion = PokemonHelper.calcNativeRegion(pokemon.name);
@@ -126,6 +142,7 @@ class PokedexHelper {
             }
 
             const caughtShiny = PokedexFilters.caughtShiny.value();
+
             // Only uncaught
             if (caughtShiny == 'uncaught' && alreadyCaught) {
                 return false;
@@ -146,6 +163,21 @@ class PokedexHelper {
                 return false;
             }
 
+            // Only caught not shadow
+            if (caughtShiny == 'caught-not-shadow' && (!alreadyCaught || alreadyCaughtShadow)) {
+                return false;
+            }
+
+            // Only caught shadow
+            if (caughtShiny == 'caught-shadow' && (!alreadyCaughtShadow || alreadyCaughtPurified)) {
+                return false;
+            }
+
+            // Only caught purified
+            if (caughtShiny == 'caught-purified' && !alreadyCaughtPurified) {
+                return false;
+            }
+
             /* Only base form if alternate exist (Zarbi, Basculin, ...)
              * Mainline regional forms are shown as they are part of dex completion
              */
@@ -163,9 +195,19 @@ class PokedexHelper {
                 return false;
             }
 
-            // Only pokemon with selected category
-            if (PokedexFilters.category.value() != -1 && PokedexFilters.category.value() != App.game.party.getPokemon(pokemon.id)?.category) {
-                return false;
+            if (PokedexFilters.category.value() != -1) {
+                if (!alreadyCaught) {
+                    return false;
+                }
+                const partyPokemon = App.game.party.getPokemon(pokemon.id);
+                // Categorized only
+                if (PokedexFilters.category.value() == -2 && partyPokemon.isUncategorized()) {
+                    return false;
+                }
+                // Selected category
+                if (PokedexFilters.category.value() >= 0 && !partyPokemon.category.includes(PokedexFilters.category.value())) {
+                    return false;
+                }
             }
 
             const uniqueTransformation = PokedexFilters.uniqueTransformation.value();
@@ -175,11 +217,11 @@ class PokedexHelper {
                 return false;
             }
             // Only Base Pokémon without Mega Evolution
-            if (uniqueTransformation == 'mega-unobtained' && !(PokemonHelper.hasMegaEvolution(pokemon.name) && (pokemon as PokemonListData).evolutions?.some((e) => !App.game.party.alreadyCaughtPokemonByName(e.evolvedPokemon)))) {
+            if (uniqueTransformation == 'mega-unobtained' && !PokemonHelper.hasUncaughtMegaEvolution(pokemon.name)) {
                 return false;
             }
             // Only Mega Pokémon
-            if (uniqueTransformation == 'mega-evolution' && !(PokemonHelper.getPokemonPrevolution(pokemon.name)?.some((e) => PokemonHelper.hasMegaEvolution(e.basePokemon)))) {
+            if (uniqueTransformation == 'mega-evolution' && !PokemonHelper.isMegaEvolution(pokemon.name)) {
                 return false;
             }
 
@@ -201,10 +243,15 @@ class PokedexHelper {
     private static isPureType(pokemon: PokemonListData, type: (PokemonType | null)): boolean {
         return (pokemon.type.length === 1 && (type == null || pokemon.type[0] === type));
     }
-}
 
-$(document).ready(() => {
-    $('#pokemonStatisticsModal').on('hidden.bs.modal', () => {
-        PokedexHelper.toggleStatisticShiny(true);
-    });
-});
+    // Flag for the LazyLoader
+    public static resetPokedexFlag = ko.computed(() => modalUtils.observableState.pokedexModal === 'hidden');
+
+    private static scrollToTop() {
+        document.querySelector('#pokedex-pokemon-list-container .scrolling-div-pokedex').scrollTop = 0;
+    }
+
+    public static filteredListPartyPokemon(): Array<PartyPokemon> {
+        return PokedexHelper.filteredList().map((p) => App.game.party.getPokemon(p.id)).filter((p) => p !== undefined);
+    }
+}

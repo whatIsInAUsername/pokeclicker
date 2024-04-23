@@ -1,3 +1,4 @@
+import '../koExtenders';
 import PokemonType from '../enums/PokemonType';
 import { Pokerus, Region } from '../GameConstants';
 import SettingOption from './SettingOption';
@@ -59,6 +60,9 @@ const PokedexFilters: Record<string, FilterOption> = {
             new SettingOption('Caught', 'caught'),
             new SettingOption('Caught Not Shiny', 'caught-not-shiny'),
             new SettingOption('Caught Shiny', 'caught-shiny'),
+            new SettingOption('Caught Not Shadow', 'caught-not-shadow'),
+            new SettingOption('Caught Shadow', 'caught-shadow'),
+            new SettingOption('Caught Purified', 'caught-purified'),
         ],
     ),
     statusPokerus: new FilterOption<number>(
