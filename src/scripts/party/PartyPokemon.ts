@@ -15,6 +15,7 @@ enum PartyPokemonSaveKeys {
     nickname,
     shadow,
     showShadowImage,
+    optimizeVitaminsOnEgg,
 }
 
 class PartyPokemon implements Saveable {
@@ -31,7 +32,7 @@ class PartyPokemon implements Saveable {
         exp: 0,
         breeding: false,
         shiny: false,
-        category: [0],
+        category: 0,
         levelEvolutionTriggered: false,
         pokerus: GameConstants.Pokerus.Uninfected,
         effortPoints: 0,
@@ -40,6 +41,7 @@ class PartyPokemon implements Saveable {
         nickname: '',
         shadow: GameConstants.ShadowStatus.None,
         showShadowImage: false,
+        optimizeVitaminsOnEgg: false,
     };
 
     // Saveable observables
@@ -49,7 +51,7 @@ class PartyPokemon implements Saveable {
     _level: KnockoutObservable<number>;
     _attackBonusPercent: KnockoutObservable<number>;
     _attackBonusAmount: KnockoutObservable<number>;
-    _category: KnockoutObservableArray<number>;
+    _category: KnockoutObservable<number>;
     _translatedName: KnockoutObservable<string>;
     _nickname: KnockoutObservable<string>;
     _displayName: KnockoutComputed<string>;
@@ -61,6 +63,7 @@ class PartyPokemon implements Saveable {
     hideShinyImage: KnockoutObservable<boolean>;
     _shadow: KnockoutObservable<GameConstants.ShadowStatus>;
     _showShadowImage: KnockoutObservable<boolean>;
+    _optimizeVitaminsOnEgg: KnockoutObservable<boolean>;
 
     constructor(
         public id: number,
@@ -79,33 +82,30 @@ class PartyPokemon implements Saveable {
         this._level = ko.observable(1).extend({ numeric: 0 });
         this._attackBonusPercent = ko.observable(0).extend({ numeric: 0 });
         this._attackBonusAmount = ko.observable(0).extend({ numeric: 0 });
-        this._category = ko.observableArray([0]);
+        this._category = ko.observable(0).extend({ numeric: 0 });
         this._translatedName = PokemonHelper.displayName(name);
         this._pokerus = ko.observable(GameConstants.Pokerus.Uninfected).extend({ numeric: 0 });
         this._effortPoints = ko.observable(0).extend({ numeric: 0 });
         this.evs = ko.pureComputed(() => {
-            return Math.floor(this.calculateEVs());
+            const power = App.game.challenges.list.slowEVs.active.peek() ? GameConstants.EP_CHALLENGE_MODIFIER : 1;
+            return Math.floor(this._effortPoints() / GameConstants.EP_EV_RATIO / power);
         });
-        const resistantSub = this.evs.subscribe((newValue) => {
+        this.evs.subscribe((newValue) => {
             // Change Pokerus status to Resistant when reaching 50 EVs
-            if (this.pokerus && newValue >= 50) {
-                // Only notify if not yet Resistant, i.e. not when game loads already-Resistant party members
-                if (this.pokerus < GameConstants.Pokerus.Resistant) {
-                    this.pokerus = GameConstants.Pokerus.Resistant;
+            if (this.pokerus && this.pokerus < GameConstants.Pokerus.Resistant && newValue >= 50) {
+                this.pokerus = GameConstants.Pokerus.Resistant;
 
-                    // Log and notify player
-                    Notifier.notify({
-                        message: `${this.name} has become Resistant to Pokérus.`,
-                        pokemonImage: PokemonHelper.getImage(this.id),
-                        type: NotificationConstants.NotificationOption.info,
-                        sound: NotificationConstants.NotificationSound.General.pokerus,
-                        setting: NotificationConstants.NotificationSetting.General.pokerus,
-                    });
-                    App.game.logbook.newLog(LogBookTypes.NEW, createLogContent.resistantToPokerus({ pokemon: this.name }));
-                }
-                resistantSub.dispose();
+                // Log and notify player
+                Notifier.notify({
+                    message: `${this.name} has become Resistant to Pokérus.`,
+                    pokemonImage: PokemonHelper.getImage(this.id, this.shiny),
+                    type: NotificationConstants.NotificationOption.info,
+                    setting: NotificationConstants.NotificationSetting.General.pokerus,
+                });
+                App.game.logbook.newLog(LogBookTypes.NEW, createLogContent.resistantToPokerus({ pokemon: this.name }));
             }
         });
+        this._attack = ko.pureComputed(() => this.calculateAttack());
         this.heldItem = ko.observable(undefined);
         this.defaultFemaleSprite = ko.observable(false);
         this.hideShinyImage = ko.observable(false);
@@ -113,18 +113,11 @@ class PartyPokemon implements Saveable {
         this._displayName = ko.pureComputed(() => this._nickname() ? this._nickname() : this._translatedName());
         this._shadow = ko.observable(shadow);
         this._showShadowImage = ko.observable(false);
-        this._attack = ko.computed(() => this.calculateAttack());
+        this._optimizeVitaminsOnEgg = ko.observable(false);
         this._canUseHeldItem = ko.pureComputed(() => this.heldItem()?.canUse(this));
         this._canUseHeldItem.subscribe((canUse) => {
             if (!canUse && this.heldItem()) {
                 this.addOrRemoveHeldItem(this.heldItem());
-            }
-        });
-        this._category.subscribe((newValue) => {
-            if (!newValue.length) {
-                this._category.push(0); // add None category
-            } else if (newValue.length > 1) {
-                this.removeCategory(0); // remove None category
             }
         });
     }
@@ -133,16 +126,10 @@ class PartyPokemon implements Saveable {
         const attackBonusMultiplier = 1 + (this.attackBonusPercent / 100);
         const levelMultiplier = ignoreLevel ? 1 : this.level / 100;
         const evsMultiplier = this.calculateEVAttackBonus();
-        const heldItemMultiplier = this.heldItemAttackBonus();
-        const shadowMultiplier = this.shadowAttackBonus();
+        const heldItemMultiplier = this.heldItem && this.heldItem() instanceof AttackBonusHeldItem ? (this.heldItem() as AttackBonusHeldItem).attackBonus : 1;
+        const shadowMultiplier = this.shadow == GameConstants.ShadowStatus.Shadow ? 0.8 : (this.shadow == GameConstants.ShadowStatus.Purified ? 1.2 : 1);
         return Math.max(1, Math.floor((this.baseAttack * attackBonusMultiplier + this.attackBonusAmount) * levelMultiplier * evsMultiplier * heldItemMultiplier * shadowMultiplier));
     }
-
-    public clickAttackBonus = ko.pureComputed((): number => {
-        // Caught + Shiny + Resistant + Purified
-        const bonus = 1 + +this.shiny + +(this.pokerus >= GameConstants.Pokerus.Resistant) + +(this.shadow == GameConstants.ShadowStatus.Purified);
-        return bonus;
-    });
 
     public canCatchPokerus(): boolean {
         return App.game.keyItems.hasKeyItem(KeyItemType.Pokerus_virus);
@@ -192,22 +179,16 @@ class PartyPokemon implements Saveable {
         return this.level;
     }
 
-    public calculateEVs(): number {
-        const power = App.game.challenges.list.slowEVs.active.peek() ? GameConstants.EP_CHALLENGE_MODIFIER : 1;
-        return this._effortPoints() / GameConstants.EP_EV_RATIO / power;
-    }
-
     public gainExp(exp: number) : number {
         const expGained = exp * this.getExpMultiplier();
         if (this.level < App.game.badgeCase.maxLevel()) {
             this.exp += expGained;
-
-            const oldLevel = this.level;
-            const newLevel = this.calculateLevelFromExp();
-            if (oldLevel !== newLevel) {
-                this.level = newLevel;
-                this.checkForLevelEvolution();
-            }
+        }
+        const oldLevel = this.level;
+        const newLevel = this.calculateLevelFromExp();
+        if (oldLevel !== newLevel) {
+            this.level = newLevel;
+            this.checkForLevelEvolution();
         }
         return expGained;
     }
@@ -337,12 +318,6 @@ class PartyPokemon implements Saveable {
                 type: NotificationConstants.NotificationOption.danger,
             });
             return;
-        } else {
-            Notifier.notify({
-                title: 'Test',
-                message: `${bv["calcium"]} You good, thats for ${this.displayName} `,
-                type: NotificationConstants.NotificationOption.success,
-            });
         }
 
         if (this.breeding) {
@@ -361,6 +336,10 @@ class PartyPokemon implements Saveable {
             this.useVitamin(v, bv[GameConstants.VitaminType[v].toLowerCase()]);
         });
 
+    }
+
+    public toggleOptimizeVitaminsOnEgg(): void {
+        this.optimizeVitaminsOnEgg = !this.optimizeVitaminsOnEgg;
     }
 
     public calcBreedingAttackBonus(vitaminsUsed): number {
@@ -387,18 +366,20 @@ class PartyPokemon implements Saveable {
             carbos: 0,
             eff: this.getEfficiency([0,0,0]),
         };
-        let totalVitamins = (player.highestRegion() + 1) * 5;
+        const totalVitamins = (player.highestRegion() + 1) * 5;
         // Unlocked at Unova
         let carbos = (player.highestRegion() >= GameConstants.Region.unova ? totalVitamins : 0) + 1;
         while (carbos-- > 0) {
             // Unlocked at Hoenn
-            let calcium = (player.highestRegion() >= GameConstants.Region.hoenn ? totalVitamins - carbos: 0) + 1;
+            let calcium = (player.highestRegion() >= GameConstants.Region.hoenn ? totalVitamins - carbos : 0) + 1;
             while (calcium-- > 0) {
                 let protein = (totalVitamins - (carbos + calcium)) + 1;
                 while (protein-- > 0) {
                     const eff = this.getEfficiency([protein, calcium, carbos]);
                     // If the previous result is better than this, no point to continue
-                    if (eff < res.eff) break;
+                    if (eff < res.eff) {
+                        break;
+                    }
                     // Push our data if same or better
                     res = {
                         protein,
@@ -469,32 +450,16 @@ class PartyPokemon implements Saveable {
         return (this.baseAttack * attackBonusPercent) + proteinBoost;
     });
 
-    heldItemAttackBonus = ko.pureComputed((): number => {
-        return this.heldItem && this.heldItem() instanceof AttackBonusHeldItem ? (this.heldItem() as AttackBonusHeldItem).attackBonus : 1;
-    });
-
-    shadowAttackBonus = ko.pureComputed((): number => {
-        return this.shadow == GameConstants.ShadowStatus.Shadow ? 0.8 : (this.shadow == GameConstants.ShadowStatus.Purified ? 1.2 : 1);
-    });
-
     breedingEfficiency = ko.pureComputed((): number => {
-        let breedingAttackBonus = this.getBreedingAttackBonus();
-        if (Settings.getSetting('breedingEfficiencyAllModifiers').observableValue()) {
-            breedingAttackBonus *= this.calculateEVAttackBonus() * this.heldItemAttackBonus() * this.shadowAttackBonus();
-        }
-
-        return (breedingAttackBonus / this.getEggSteps()) * GameConstants.EGG_CYCLE_MULTIPLIER;
+        return ((this.getBreedingAttackBonus() * this.calculateEVAttackBonus()) / this.getEggSteps()) * GameConstants.EGG_CYCLE_MULTIPLIER;
     });
 
     public isHatchable = ko.pureComputed(() => {
-        return !(this.breeding || this.level < 100);
-    });
+        // Only breedable Pokemon
+        if (this.breeding || this.level < 100) {
+            return false;
+        }
 
-    public isHatchableFiltered = ko.pureComputed(() => {
-        return this.isHatchable() && this.matchesHatcheryFilters();
-    });
-
-    public matchesHatcheryFilters = ko.pureComputed(() => {
         // Check if search matches englishName or displayName
         const displayName = PokemonHelper.displayName(this.name)();
         const filterName = BreedingFilters.name.value();
@@ -508,14 +473,11 @@ class PartyPokemon implements Saveable {
             return false;
         }
 
-        // Categorized only
-        if (BreedingFilters.category.value() == -2 && this.isUncategorized()) {
-            return false;
-        }
-
-        // Selected category
-        if (BreedingFilters.category.value() >= 0 && !this.category.includes(BreedingFilters.category.value())) {
-            return false;
+        // Check based on category
+        if (BreedingFilters.category.value() >= 0) {
+            if (this.category !== BreedingFilters.category.value()) {
+                return false;
+            }
         }
 
         // Check based on shiny status
@@ -549,20 +511,12 @@ class PartyPokemon implements Saveable {
             return false;
         }
         // Only Base Pokémon without Mega Evolution
-        if (uniqueTransformation == 'mega-unobtained' && !PokemonHelper.hasUncaughtMegaEvolution(pokemon.name)) {
+        if (uniqueTransformation == 'mega-unobtained' && !(PokemonHelper.hasMegaEvolution(pokemon.name) && (pokemon as DataPokemon).evolutions?.some((e) => !App.game.party.alreadyCaughtPokemonByName(e.evolvedPokemon)))) {
             return false;
         }
         // Only Mega Pokémon
-        if (uniqueTransformation == 'mega-evolution' && !PokemonHelper.isMegaEvolution(pokemon.name)) {
+        if (uniqueTransformation == 'mega-evolution' && !(PokemonHelper.getPokemonPrevolution(pokemon.name)?.some((e) => PokemonHelper.hasMegaEvolution(e.basePokemon)))) {
             return false;
-        }
-
-        // Check based on alternate form status (if native to a different region have to include for that region's progression)
-        if (BreedingFilters.hideAlternate.value() && !Number.isInteger(pokemon.id)) {
-            const hasBaseFormInSameRegion = pokemonList.some((p) => Math.floor(p.id) == Math.floor(pokemon.id) && p.id < pokemon.id && PokemonHelper.calcNativeRegion(p.name) == region);
-            if (hasBaseFormInSameRegion) {
-                return false;
-            }
         }
 
         // Check if either of the types match
@@ -601,7 +555,7 @@ class PartyPokemon implements Saveable {
             }
         }
 
-        if (this.heldItem() && Settings.getSetting('confirmChangeHeldItem').value) {
+        if (this.heldItem()) {
             Notifier.confirm({
                 title: 'Remove held item',
                 message: 'Held items are one time use only.\nRemoved items will be lost.\nAre you sure you want to remove it?',
@@ -615,8 +569,8 @@ class PartyPokemon implements Saveable {
         } else { // Notifier.confirm is async
             this.addOrRemoveHeldItem(heldItem);
         }
-    }
 
+    }
     private addOrRemoveHeldItem(heldItem: HeldItem) {
         if (this.heldItem() && this.heldItem().name == heldItem.name) {
             this.heldItem(undefined);
@@ -624,43 +578,6 @@ class PartyPokemon implements Saveable {
             player.loseItem(heldItem.name, 1);
             this.heldItem(heldItem);
         }
-    }
-
-    public addCategory(id: number) {
-        if (!this.category.includes(id)) {
-            this._category.push(id);
-        }
-    }
-
-    public removeCategory(id: number) {
-        const index = this.category.indexOf(id);
-        if (index > -1) {
-            this._category.splice(index, 1);
-        }
-    }
-
-    public toggleCategory(id: number) {
-        if (this.category.includes(id)) {
-            this.removeCategory(id);
-        } else {
-            if (id === 0) {
-                this.resetCategory();
-            } else {
-                this.addCategory(id);
-            }
-        }
-    }
-
-    public resetCategory(): void {
-        this.category = [...this.defaults.category];
-    }
-
-    public isUncategorized = ko.pureComputed(() => this.category[0] === 0);
-
-    public getCategorySortValues(): Array<number> {
-        return PokemonCategories.categories().map((c, i) => [c.id, i])
-            .filter(([id, _]) => this.category.includes(id))
-            .map(([_, index]) => index);
     }
 
     public fromJSON(json: Record<string, any>): void {
@@ -682,7 +599,7 @@ class PartyPokemon implements Saveable {
         this.exp = json[PartyPokemonSaveKeys.exp] ?? this.defaults.exp;
         this.breeding = json[PartyPokemonSaveKeys.breeding] ?? this.defaults.breeding;
         this.shiny = json[PartyPokemonSaveKeys.shiny] ?? this.defaults.shiny;
-        this.category = json[PartyPokemonSaveKeys.category] ?? [...this.defaults.category];
+        this.category = json[PartyPokemonSaveKeys.category] ?? this.defaults.category;
         this.level = this.calculateLevelFromExp();
         this.pokerus = json[PartyPokemonSaveKeys.pokerus] ?? this.defaults.pokerus;
         this.effortPoints = json[PartyPokemonSaveKeys.effortPoints] ?? this.defaults.effortPoints;
@@ -692,6 +609,7 @@ class PartyPokemon implements Saveable {
         this._nickname(json[PartyPokemonSaveKeys.nickname] || this.defaults.nickname);
         this.shadow = json[PartyPokemonSaveKeys.shadow] ?? this.defaults.shadow;
         this._showShadowImage(json[PartyPokemonSaveKeys.showShadowImage] ?? this.defaults.showShadowImage);
+        this._optimizeVitaminsOnEgg(json[PartyPokemonSaveKeys.optimizeVitaminsOnEgg] ?? this.defaults.optimizeVitaminsOnEgg);
     }
 
     public toJSON() {
@@ -703,7 +621,7 @@ class PartyPokemon implements Saveable {
             [PartyPokemonSaveKeys.exp]: this.exp,
             [PartyPokemonSaveKeys.breeding]: this.breeding,
             [PartyPokemonSaveKeys.shiny]: this.shiny,
-            [PartyPokemonSaveKeys.category]: this.isUncategorized() ? undefined : this.category,
+            [PartyPokemonSaveKeys.category]: this.category,
             [PartyPokemonSaveKeys.pokerus]: this.pokerus,
             [PartyPokemonSaveKeys.effortPoints]: this.effortPoints,
             [PartyPokemonSaveKeys.heldItem]: this.heldItem()?.name,
@@ -712,6 +630,7 @@ class PartyPokemon implements Saveable {
             [PartyPokemonSaveKeys.nickname]: this.nickname || undefined,
             [PartyPokemonSaveKeys.shadow]: this.shadow,
             [PartyPokemonSaveKeys.showShadowImage]: this._showShadowImage(),
+            [PartyPokemonSaveKeys.optimizeVitaminsOnEgg]: this._optimizeVitaminsOnEgg(),
         };
 
         // Don't save anything that is the default option
@@ -785,12 +704,12 @@ class PartyPokemon implements Saveable {
         this._shiny(bool);
     }
 
-    get category(): Array<number> {
+    get category(): number {
         return this._category();
     }
 
-    set category(value: Array<number>) {
-        this._category(value);
+    set category(index: number) {
+        this._category(index);
     }
 
     get nickname(): string {
@@ -819,5 +738,13 @@ class PartyPokemon implements Saveable {
 
     set showShadowImage(value: boolean) {
         this._showShadowImage(value);
+    }
+
+    get optimizeVitaminsOnEgg(): boolean {
+        return this._optimizeVitaminsOnEgg();
+    }
+
+    set optimizeVitaminsOnEgg(value: boolean) {
+        this._optimizeVitaminsOnEgg(value);
     }
 }

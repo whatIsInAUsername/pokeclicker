@@ -1,6 +1,5 @@
 import { AchievementOption } from '../GameConstants';
 import QuestLineState from '../quests/QuestLineState';
-import { QuestLineNameType } from '../quests/QuestLineNameType';
 
 import Requirement from './Requirement';
 
@@ -13,7 +12,7 @@ export default class QuestLineStepCompletedRequirement extends Requirement {
         return this.cachedQuest;
     }
 
-    constructor(private questLineName: QuestLineNameType, private questIndex: (() => number) | number, option = AchievementOption.equal) {
+    constructor(private questLineName: string, private questIndex: (() => number) | number, option = AchievementOption.equal) {
         super(1, option);
     }
 

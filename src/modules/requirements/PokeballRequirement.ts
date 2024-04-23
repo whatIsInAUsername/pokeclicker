@@ -13,8 +13,4 @@ export default class PokeballRequirement extends AchievementRequirement {
     public hint(): string {
         return `${this.requiredValue} ${GameConstants.Pokeball[this.pokeball]} need to be obtained.`;
     }
-
-    public toString(): string {
-        return `${super.toString()} ${this.pokeball}`;
-    }
 }

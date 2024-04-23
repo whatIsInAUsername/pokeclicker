@@ -40,6 +40,9 @@
     <!--Minified styles-->
     <link href="styles/styles.min.css?v=$VERSION" rel="stylesheet">
 
+    <!-- Google Analytics-->
+    @importif $GOOGLE_ANALYTICS_ID "googleAnalytics.html"
+
     <style>
         #game.loading {
             display: none !important;
@@ -85,7 +88,7 @@
 <!--$DEV_BANNER-->
 @importif $DEV_BANNER "developmentBanner.html"
 
-<!-- Splash Screen -->
+<!-- Spash Screen -->
 @import "saveSelector.html"
 @import "splash.html"
 
@@ -115,8 +118,6 @@
 @import "templates/pokemonAttackTemplate.html"
 @import "templates/pokemonGenderStatisticTemplate.html"
 @import "templates/multiSelectDropdownTemplate.html"
-@import "templates/currencyContainerCurrencyTemplate.html"
-@import "templates/wanderingPokemonDisplay.html"
 
 <div id="game" class="container loading" data-bind="css: {'container': Settings.getSetting('gameDisplayStyle').observableValue() === 'standard3', 'container-fluid': Settings.getSetting('gameDisplayStyle').observableValue() !== 'standard3'}">
     <div class="row justify-content-center">
@@ -149,6 +150,7 @@
 
                     <!-- Pokémon List container-->
                     @import "pokemonListContainer.html"
+
                 </div>
             </div>
         </div>
@@ -161,11 +163,68 @@
             <div id="middle-top-sort-column">
                 <!-- Achievement Tracker -->
                 @import "achievementTrackerContainer.html"
-
-                <!-- Currency container -->
-                @import "currencyContainer.html"
             </div>
+
             <div id="battleContainer" class="card sortable-disabled border-secondary mb-3">
+
+                <div class="card-header p-0" data-bind="visible: (App.game.gameState === GameConstants.GameState.fighting ||
+                                     App.game.gameState === GameConstants.GameState.dungeon ||
+                                     App.game.gameState === GameConstants.GameState.paused ||
+                                     App.game.gameState === GameConstants.GameState.town ||
+                                     App.game.gameState === GameConstants.GameState.shop ||
+                                     App.game.gameState === GameConstants.GameState.gym ||
+                                     App.game.gameState === GameConstants.GameState.battleFrontier ||
+                                     App.game.gameState === GameConstants.GameState.temporaryBattle)">
+                    <table width="100%">
+                        <tr class="row">
+                            <td class="col">
+                                <span style="display: inline; position: relative;">
+                                    <img title="Pokédollars&#013;&#010;Gained by defeating Pokémon and trainers in battle" src="assets/images/currency/money.svg" height="25px">
+                                    <span id="animateCurrency-money" data-bind="text: Settings.getSetting('currencyMainDisplayReduced').observableValue() ? GameConstants.formatNumber(App.game.wallet.currencies[GameConstants.Currency.money]()) : App.game.wallet.currencies[GameConstants.Currency.money]().toLocaleString('en-US')">0</span>
+                                </span>
+                            </td>
+                            <td class="col">
+                                <span style="display: inline; position: relative;">
+                                    <img title="Dungeon Tokens&#013;&#010;Gained by catching wild Pokémon" src="assets/images/currency/dungeonToken.svg" height="25px">
+                                    <span id="animateCurrency-dungeonToken" data-bind="text: Settings.getSetting('currencyMainDisplayReduced').observableValue() ? GameConstants.formatNumber(App.game.wallet.currencies[GameConstants.Currency.dungeonToken]()) : App.game.wallet.currencies[GameConstants.Currency.dungeonToken]().toLocaleString('en-US')">0</span>
+                                </span>
+                            </td>
+                            <td class="col">
+                                <span style="display: inline; position: relative;">
+                                    <img title="Quest Points&#013;&#010;Gained by completing Quests" src="assets/images/currency/questPoint.svg" height="25px">
+                                    <span id="animateCurrency-questPoint" data-bind="text: Settings.getSetting('currencyMainDisplayReduced').observableValue() ? GameConstants.formatNumber(App.game.wallet.currencies[GameConstants.Currency.questPoint]()) : App.game.wallet.currencies[GameConstants.Currency.questPoint]().toLocaleString('en-US')">0</span>
+                                </span>
+                            </td>
+                        </tr>
+                        <tr class="row" data-bind="visible: Settings.getSetting('currencyMainDisplayExtended').observableValue()">
+                            <td class="col">
+                                <span style="display: inline; position: relative;">
+                                    <img title="Farm Points&#013;&#010;Gained at the Farm" src="assets/images/currency/farmPoint.svg" height="25px">
+                                    <span id="animateCurrency-farmPoint" data-bind="text: Settings.getSetting('currencyMainDisplayReduced').observableValue() ? GameConstants.formatNumber(App.game.wallet.currencies[GameConstants.Currency.farmPoint]()) : App.game.wallet.currencies[GameConstants.Currency.farmPoint]().toLocaleString('en-US')">0</span>
+                                </span>
+                            </td>
+                            <td class="col">
+                                <span style="display: inline; position: relative;">
+                                    <img title="Diamonds&#013;&#010;Gained in the Underground" src="assets/images/currency/diamond.svg" height="25px">
+                                    <span id="animateCurrency-diamond" data-bind="text: Settings.getSetting('currencyMainDisplayReduced').observableValue() ? GameConstants.formatNumber(App.game.wallet.currencies[GameConstants.Currency.diamond]()) : App.game.wallet.currencies[GameConstants.Currency.diamond]().toLocaleString('en-US')">0</span>
+                                </span>
+                            </td>
+                            <td class="col">
+                                <span style="display: inline; position: relative;">
+                                    <img title="Battle Points&#013;&#010;Gained at the Battle Frontier" src="assets/images/currency/battlePoint.svg" height="25px">
+                                    <span id="animateCurrency-battlePoint" data-bind="text: Settings.getSetting('currencyMainDisplayReduced').observableValue() ? GameConstants.formatNumber(App.game.wallet.currencies[GameConstants.Currency.battlePoint]()) : App.game.wallet.currencies[GameConstants.Currency.battlePoint]().toLocaleString('en-US')">0</span>
+                                </span>
+                            </td>
+                            <td class="col" data-bind="visible: Settings.getSetting('currencyMainDisplayExtended').observableValue() && PokemonContestController.requirements.isCompleted()">
+                                <span style="display: inline; position: relative;">
+                                    <img title="Contest Tokens&#013;&#010;Gained by competing in Contests" src="assets/images/currency/contestToken.svg" height="25px">
+                                    <span id="animateCurrency-contestToken" data-bind="text: Settings.getSetting('currencyMainDisplayReduced').observableValue() ? GameConstants.formatNumber(App.game.wallet.currencies[GameConstants.Currency.contestToken]()) : App.game.wallet.currencies[GameConstants.Currency.contestToken]().toLocaleString('en-US')">0</span>
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
                 <!--RouteBattleView-->
                 <!--Use the base battle layout for fighting, dungeons and battle frontier.-->
 
@@ -181,9 +240,7 @@
                                     <knockout data-bind="template: { name: 'pokemonNameTemplate', data: { 'pokemon': Battle.enemyPokemon() } }">Pokémon name</knockout>
                                     <knockout data-bind="template: { name: 'caughtStatusTemplate', data: {'status': PartyController.getCaughtStatus(Battle.enemyPokemon().id)}}"></knockout>
                                     <knockout style="position: relative; top: -1px;"
-                                        data-bind="template: { name: 'pokerusStatusTemplate', data: {
-                                            'pokerus': PartyController.getPokerusStatus(Battle.enemyPokemon().id),
-                                            'evs': App.game.party.getPokemon(Battle.enemyPokemon().id)?.evs() }}">
+                                        data-bind="template: { name: 'pokerusStatusTemplate', data: { 'pokerus': PartyController.getPokerusStatus(Battle.enemyPokemon().id) }}">
                                     </knockout>
                                 </knockout>
                             </h2>
@@ -416,12 +473,6 @@
                     <!-- Egg Slots/Breeding-->
                     @import "breedingDisplay.html"
 
-                    <!-- Farm -->
-                    @import "farmDisplay.html"
-
-                    <!-- Underground -->
-                    @import "undergroundDisplay.html"
-
                     <!-- Shortcuts Menu -->
                     @import "shortcutsContainer.html"
                 </div>
@@ -448,7 +499,7 @@
 @import "temporaryBattleWonModal.html"
 
 <!-- Quest Step Cleared -->
-@import "questStepClearedModal.html"
+@import "customQuestStepClearedModal.html"
 
 <!-- Achievements Modal -->
 @import "achievementsModal.html"

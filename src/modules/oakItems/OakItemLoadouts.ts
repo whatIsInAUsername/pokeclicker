@@ -1,8 +1,7 @@
-import type {
+import {
     Observable as KnockoutObservable,
     Computed as KnockoutComputed,
 } from 'knockout';
-import '../koExtenders';
 import { Saveable } from '../DataStore/common/Saveable';
 import OakItemType from '../enums/OakItemType';
 import OakItemLoadout from './OakItemLoadout';

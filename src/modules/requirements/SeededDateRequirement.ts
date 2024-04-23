@@ -1,6 +1,4 @@
 import { AchievementOption } from '../GameConstants';
-import GameHelper from '../GameHelper';
-import SeededDateRand from '../utilities/SeededDateRand';
 import Requirement from './Requirement';
 
 export default class SeededDateRequirement extends Requirement {
@@ -11,7 +9,6 @@ export default class SeededDateRequirement extends Requirement {
     }
 
     public getProgress(): number {
-        SeededDateRand.seedWithDate(GameHelper.today());
         return +this.seededRandFunction();
     }
 

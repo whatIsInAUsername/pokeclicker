@@ -4,7 +4,7 @@ class GiftNPC extends NPC {
     constructor(
         public name: string,
         public dialog: string[],
-        public giftFunction: () => void,
+        private giftFunction: () => void,
         public giftImage?: string,
         options: NPCOptionalArgument = {}
     ) {

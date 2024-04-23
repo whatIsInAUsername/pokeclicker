@@ -1,5 +1,4 @@
-import '../koExtenders';
-import type {
+import {
     Observable as KnockoutObservable,
 } from 'knockout';
 import { Saveable } from '../DataStore/common/Saveable';

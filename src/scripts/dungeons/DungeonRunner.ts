@@ -19,12 +19,8 @@ class DungeonRunner {
     public static fightingLootEnemy: boolean;
     public static continuousInteractionInput = false;
 
-    public static initializeDungeon(dungeon: Dungeon) {
+    public static initializeDungeon(dungeon) {
         if (!dungeon.isUnlocked()) {
-            Notifier.notify({
-                message: `You don't have access to this dungeon yet.\n<i>${dungeon.getRequirementHints()}</i>`,
-                type: NotificationConstants.NotificationOption.warning,
-            });
             return false;
         }
         DungeonRunner.dungeon = dungeon;
@@ -57,7 +53,7 @@ class DungeonRunner {
             let tier = dungeon.getRandomLootTier(clears);
             let loot = dungeon.getRandomLoot(tier);
             if (!loot.ignoreDebuff && debuffed) {
-                tier = dungeon.getRandomLootTier(clears, debuffed, true);
+                tier = dungeon.getRandomLootTier(clears, debuffed);
                 loot = dungeon.getRandomLoot(tier, true);
             }
 
@@ -86,7 +82,6 @@ class DungeonRunner {
             } else {
                 DungeonRunner.dungeonLost();
             }
-            return;
         }
         if (DungeonRunner.map.playerMoved()) {
             DungeonRunner.timeLeft(DungeonRunner.timeLeft() - GameConstants.DUNGEON_TICK);
@@ -266,7 +261,7 @@ class DungeonRunner {
             DungeonRunner.dungeonFinished(true);
             DungeonRunner.fighting(false);
             DungeonRunner.fightingBoss(false);
-            App.game.gameState = GameConstants.GameState.town;
+            MapHelper.moveToTown(DungeonRunner.dungeon.name);
         }
     }
 
@@ -275,7 +270,7 @@ class DungeonRunner {
             DungeonRunner.dungeonFinished(true);
             DungeonRunner.fighting(false);
             DungeonRunner.fightingBoss(false);
-            App.game.gameState = GameConstants.GameState.town;
+            MapHelper.moveToTown(DungeonRunner.dungeon.name);
             Notifier.notify({
                 message: 'You could not complete the dungeon in time.',
                 type: NotificationConstants.NotificationOption.danger,

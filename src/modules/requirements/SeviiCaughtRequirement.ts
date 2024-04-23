@@ -20,8 +20,4 @@ export default class SeviiCaughtRequirement extends AchievementRequirement {
     public hint(): string {
         return `${this.requiredValue} unique Sevii Pokémon need to be caught.`;
     }
-
-    public toString(): string {
-        return `${super.toString()} ${this.shiny}`;
-    }
 }

@@ -1,4 +1,3 @@
-import '../koExtenders';
 import PokemonType from '../enums/PokemonType';
 import { Pokerus } from '../GameConstants';
 import SettingOption from './SettingOption';
@@ -74,11 +73,6 @@ const BreedingFilters: Record<string, FilterOption> = {
             new SettingOption('Unobtained Mega Evolution/Primal Reversion', 'mega-unobtained'),
             new SettingOption('Obtained Mega Evolution/Primal Reversion', 'mega-evolution'),
         ],
-    ),
-    hideAlternate: new FilterOption<boolean>(
-        'Hide alternate forms',
-        ko.observable(false),
-        'breedingHideAltFilter',
     ),
 };
 

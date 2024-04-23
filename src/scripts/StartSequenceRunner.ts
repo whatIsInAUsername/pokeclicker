@@ -61,7 +61,6 @@ class StartSequenceRunner {
         $('#pokemonListContainer').css('display', 'block');
         $('#oakItemsContainer').css('display','block');
         $('#questDisplayContainer').css('display','block');
-        $('#currencyContainer').css('display', 'block');
     }
 }
 

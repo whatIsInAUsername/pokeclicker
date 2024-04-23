@@ -1,4 +1,3 @@
-import '../koExtenders';
 import { ConsumableType } from '../GameConstants';
 
 export default class ConsumableController {

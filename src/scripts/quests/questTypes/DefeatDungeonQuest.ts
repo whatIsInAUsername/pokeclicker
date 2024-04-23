@@ -10,9 +10,6 @@ class DefeatDungeonQuest extends Quest implements QuestInterface {
     ) {
         super(amount, reward);
         this.region = GameConstants.getDungeonRegion(this.dungeon);
-        if (this.region == GameConstants.Region.none) {
-            throw new Error(`Invalid dungeon for quest: ${this.dungeon}`);
-        }
         this.focus = App.game.statistics.dungeonsCleared[GameConstants.getDungeonIndex(this.dungeon)];
     }
 
@@ -54,7 +51,7 @@ class DefeatDungeonQuest extends Quest implements QuestInterface {
     }
 
     get description(): string {
-        return this.customDescription ?? `Defeat the ${this.dungeon} dungeon in ${GameConstants.camelCaseToString(GameConstants.Region[this.region])} ${this.amount.toLocaleString('en-US')} times.`;
+        return `Defeat the ${this.dungeon} dungeon in ${GameConstants.camelCaseToString(GameConstants.Region[this.region])} ${this.amount.toLocaleString('en-US')} times.`;
     }
 
     toJSON() {

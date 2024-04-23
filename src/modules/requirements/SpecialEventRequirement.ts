@@ -1,10 +1,9 @@
 import { AchievementOption } from '../GameConstants';
-import { SpecialEventTitleType } from '../specialEvents/SpecialEventTitleType';
 
 import Requirement from './Requirement';
 
 export default class SpecialEventRequirement extends Requirement {
-    constructor(private specialEventName: SpecialEventTitleType) {
+    constructor(private specialEventName: string) {
         super(1, AchievementOption.equal);
     }
 

@@ -10,7 +10,7 @@ class QuestLine {
     private pausableStates = [GameConstants.GameState.town, GameConstants.GameState.fighting];
 
     constructor(
-        public name: QuestLineNameType,
+        public name: string,
         public description: string,
         public requirement?: Requirement,
         public bulletinBoard: GameConstants.BulletinBoards = GameConstants.BulletinBoards.None,

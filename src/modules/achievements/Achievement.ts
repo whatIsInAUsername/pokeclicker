@@ -6,6 +6,7 @@ import NotificationConstants from '../notifications/NotificationConstants';
 import Notifier from '../notifications/Notifier';
 import AchievementRequirement from '../requirements/AchievementRequirement';
 import { LogBookTypes } from '../logbook/LogBookTypes';
+import LogEvent from '../LogEvent';
 import { createLogContent } from '../logbook/helpers';
 import AchievementCategory from './AchievementCategory';
 
@@ -22,6 +23,7 @@ export default class Achievement {
         public bonusWeight: number,
         public category: AchievementCategory,
         public achievableFunction: () => boolean | null = null,
+        public stored : boolean = false,
     ) {}
 
     public check() {
@@ -44,6 +46,8 @@ export default class Achievement {
             }
             // TODO: refilter within achievement bonus
             // AchievementHandler.filterAchievementList(true);
+            // Track when users gains an achievement and their total playtime
+            LogEvent('completed achievement', 'achievements', `completed achievement (${this.name})`, App.game.statistics.secondsPlayed());
         }
     }
 

@@ -11,16 +11,14 @@ export default class HoldingItemRequirement extends Requirement {
 
     public getProgress() {
         const heldItem = App.game.party.getPokemonByName(this.pokemon)?.heldItem();
-        return heldItem?.name === this.itemName ? 1 : 0;
+        return Number(heldItem && heldItem.name === this.itemName);
     }
 
     public hint(): string {
-        return `Your pokemon must ${
-            this.option == AchievementOption.less ? 'not' : ''
-        } be holding ${
+        return `Your pokemon must be holding ${
             GameHelper.anOrA(this.itemName)
         } ${
             humanifyString(this.itemName)
-        }.`;
+        }`;
     }
 }

@@ -1,4 +1,3 @@
-import '../koExtenders';
 import { VitaminType } from '../GameConstants';
 
 export default class VitaminController {

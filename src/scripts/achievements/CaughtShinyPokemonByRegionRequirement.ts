@@ -14,8 +14,4 @@ class CaughtUniqueShinyPokemonsByRegionRequirement extends AchievementRequiremen
     public hint(): string {
         return `${this.requiredValue} unique Pokémon need to be caught.`;
     }
-
-    public toString(): string {
-        return `${super.toString()} ${this.region}`;
-    }
 }

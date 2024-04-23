@@ -20,7 +20,6 @@ export class Mine {
     public static grid: Array<Array<Observable<number>>>;
     public static rewardGrid: Array<Array<any>>;
     public static itemsFound: Observable<number> = ko.observable(0);
-    public static itemsPartiallyFound: Observable<number> = ko.observable(0);
     public static itemsBuried: Observable<number> = ko.observable(0);
     public static rewardNumbers: Array<number>;
     public static surveyResult = ko.observable(null);
@@ -31,8 +30,6 @@ export class Mine {
     private static loadingNewLayer = true;
     // Number of times to try and place an item in a new layer before giving up, just a failsafe
     private static maxPlacementAttempts = 1000;
-    // Maximum underground layer depth
-    private static maxLayerDepth = 5;
 
     public static loadMine() {
         const tmpGrid = [];
@@ -44,7 +41,7 @@ export class Mine {
             const row = [];
             const rewardRow = [];
             for (let j = 0; j < Underground.sizeX; j++) {
-                row.push(ko.observable(Math.min(Mine.maxLayerDepth, Math.max(1, Math.floor(Rand.float(2) + Rand.float(3)) + 1))));
+                row.push(ko.observable(Math.min(5, Math.max(1, Math.floor(Rand.float(2) + Rand.float(3)) + 1))));
                 rewardRow.push(0);
             }
             tmpGrid.push(row);
@@ -92,7 +89,6 @@ export class Mine {
 
         Mine.loadingNewLayer = false;
         Mine.itemsFound(0);
-        Mine.itemsPartiallyFound(0);
 
         Underground.showMine();
 
@@ -184,14 +180,14 @@ export class Mine {
         return (indexX ? 1 : 0) + (indexY ? 2 : 0);
     }
 
-    public static survey(resultTooltipID: string = undefined) {
+    public static survey() {
         // Disable survey while loading new layer
         if (this.loadingNewLayer) {
             return;
         }
 
         if (Mine.surveyResult()) {
-            $(resultTooltipID || '#mine-survey-result').tooltip('show');
+            $('#mine-survey-result').tooltip('show');
             return;
         }
 
@@ -204,12 +200,12 @@ export class Mine {
         for (let i = 0; i < tiles; i++) {
             const x = Rand.intBetween(0, this.getHeight() - 1);
             const y = Rand.intBetween(0, Underground.sizeX - 1);
-            this.breakTile(x, y, Mine.maxLayerDepth);
+            this.breakTile(x, y, 5);
         }
 
         App.game.underground.energy -= surveyCost;
         const rewards = Mine.rewardSummary();
-        Mine.updatesurveyResult(rewards, resultTooltipID);
+        Mine.updatesurveyResult(rewards);
     }
 
     private static rewardSummary() {
@@ -243,7 +239,7 @@ export class Mine {
         }, { fossils: 0, fossilpieces: 0, plates: 0, evoItems: 0, totalValue: 0, shards: 0, megaStones: 0 });
     }
 
-    private static updatesurveyResult(summary, resultTooltipID: string = undefined) {
+    private static updatesurveyResult(summary) {
         const text = [];
         if (summary.fossils) {
             text.push(`Fossils: ${summary.fossils}`);
@@ -268,7 +264,7 @@ export class Mine {
         }
 
         Mine.surveyResult(text.join('<br>'));
-        $(resultTooltipID || '#mine-survey-result').tooltip('show');
+        $('#mine-survey-result').tooltip('show');
     }
 
     public static click(i: number, j: number) {
@@ -355,7 +351,6 @@ export class Mine {
             const image = UndergroundItems.getById(reward.value).undergroundImage;
             $(`div[data-i=${x}][data-j=${y}]`).html(`<div class="mineReward size-${reward.sizeX}-${reward.sizeY} pos-${reward.x}-${reward.y} rotations-${reward.rotations}" style="background-image: url('${image}');"></div>`);
             Mine.checkItemsRevealed();
-            Mine.calculatePartiallyRevealedItems();
         }
     }
 
@@ -429,14 +424,6 @@ export class Mine {
         }
     }
 
-    public static calculatePartiallyRevealedItems() {
-        const amountRevealed = Mine.rewardNumbers
-            .map(value => Mine.checkItemPartiallyRevealed(value) ? 1 : 0)
-            .reduce((a, b) => a + b, 0);
-
-        Mine.itemsPartiallyFound(amountRevealed);
-    }
-
     public static checkItemRevealed(id: number) {
         for (let i = 0; i < Underground.sizeX; i++) {
             for (let j = 0; j < this.getHeight(); j++) {
@@ -451,20 +438,6 @@ export class Mine {
         }
         App.game.oakItems.use(OakItemType.Cell_Battery);
         return true;
-    }
-
-    public static checkItemPartiallyRevealed(id: number) {
-        for (let i = 0; i < Underground.sizeX; i++) {
-            for (let j = 0; j < this.getHeight(); j++) {
-                if (Mine.rewardGrid[j][i] != 0) {
-                    if (Mine.rewardGrid[j][i].value == id) {
-                        if (Mine.grid[j][i]() == 0)
-                            return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 
     public static checkCompleted() {
@@ -505,12 +478,10 @@ export class Mine {
         this.surveyResult(mine.surveyResult ?? this.surveyResult());
         this.skipsRemaining(mine.skipsRemaining ?? this.maxSkips);
 
-        this.calculatePartiallyRevealedItems();
-
         Underground.showMine();
         // Check if completed in case the mine was saved after completion and before creating a new mine
         // TODO: Remove setTimeout after TypeScript module migration is complete. Needed so that `App.game` is available
-        setTimeout(() => Mine.checkCompleted(), 0);
+        setTimeout(Mine.checkCompleted, 0);
     }
 
     public static save(): Record<string, any> {

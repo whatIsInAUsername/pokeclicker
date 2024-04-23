@@ -18,8 +18,6 @@ class Plot implements Saveable {
     _mulch: KnockoutObservable<MulchType>;
     _mulchTimeLeft: KnockoutObservable<number>;
 
-    _wanderer: KnockoutObservable<WandererPokemon>;
-
     _hasWarnedAboutToWither: boolean;
 
     formattedStageTimeLeft: KnockoutComputed<string>;
@@ -58,7 +56,6 @@ class Plot implements Saveable {
         this._age = ko.observable(age).extend({ numeric: 3 });
         this._mulch = ko.observable(mulch).extend({ numeric: 0 });
         this._mulchTimeLeft = ko.observable(mulchTimeLeft).extend({ numeric: 3 });
-        this._wanderer = ko.observable(undefined);
 
         this.emittingAura = {
             type: ko.pureComputed(() => {
@@ -260,7 +257,7 @@ class Plot implements Saveable {
 
             if (this.emittingAura.type() !== null) {
                 tooltip.push('<u>Aura Emitted:</u>');
-                tooltip.push(`${AuraType[this.emittingAura.type()]}: ${this.berry === BerryType.Micle ? `+${this.emittingAura.value().toLocaleString('en-US', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `×${this.emittingAura.value().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}`);
+                tooltip.push(`${AuraType[this.emittingAura.type()]}: ${this.berry === BerryType.Micle ? `+${(this.emittingAura.value() * 100).toFixed(2)}%` : `×${this.emittingAura.value().toFixed(2)}`}`);
             }
             const auraStr = this.formattedAuras();
             if (auraStr) {
@@ -273,11 +270,6 @@ class Plot implements Saveable {
                 const mulchTime = this.formattedMulchTimeLeft();
                 tooltip.push('<u>Mulch</u>');
                 tooltip.push(`${MulchType[this.mulch].replace('_Mulch','')} : ${mulchTime}`);
-            }
-
-            // Wanderer
-            if (this.wanderer) {
-                tooltip.push(`A wild <strong>${this.wanderer.name}</strong> is wandering around`);
             }
 
             return tooltip.join('<br/>');
@@ -373,7 +365,6 @@ class Plot implements Saveable {
      * @param harvested Whether this death was due to the player harvesting manually, or by withering
      */
     die(harvested = false): void {
-        this.wanderer?.distract();
         if (!harvested) {
             // Withered Berry plant drops half of the berries
             const amount = Math.max(1, Math.ceil(this.harvestAmount() / 2));
@@ -413,14 +404,7 @@ class Plot implements Saveable {
         this.age = 0;
     }
 
-    generateWanderPokemon(): WandererPokemon {
-        // Ticking the wanderer
-        if (this.wanderer) {
-            if (this.wanderer.tick()) {
-                this.wanderer = undefined;
-            }
-            return undefined;
-        }
+    generateWanderPokemon(): any {
         // Check if plot is eligible for wandering Pokemon
         if (!this.isUnlocked || this.berry === BerryType.None || this.stage() !== PlotStage.Berry) {
             return undefined;
@@ -428,25 +412,34 @@ class Plot implements Saveable {
         // Chance to generate wandering Pokemon
         if (Rand.chance(GameConstants.WANDER_RATE * App.game.farming.externalAuras[AuraType.Attract]() * (1 - App.game.farming.externalAuras[AuraType.Repel]()))) {
             // Get a random Pokemon from the list of possible encounters
-            const wanderer = PokemonFactory.generateWandererData(this);
-            this.wanderer = wanderer;
+            const availablePokemon: PokemonNameType[] = this.berryData.wander.filter(pokemon => PokemonHelper.calcNativeRegion(pokemon) <= player.highestRegion());
+            const wanderPokemon = Rand.fromArray(availablePokemon);
+
+            const shiny = PokemonFactory.generateShiny(GameConstants.SHINY_CHANCE_FARM);
 
             // Add to log book
-            if (wanderer.shiny) {
+            const pokemon = wanderPokemon;
+            if (shiny) {
                 App.game.logbook.newLog(
                     LogBookTypes.SHINY,
-                    App.game.party.alreadyCaughtPokemonByName(wanderer.name, true)
-                        ? createLogContent.shinyWanderDupe({ pokemon : wanderer.name })
-                        : createLogContent.shinyWander({ pokemon : wanderer.name })
+                    App.game.party.alreadyCaughtPokemonByName(wanderPokemon, true)
+                        ? createLogContent.shinyWanderDupe({ pokemon })
+                        : createLogContent.shinyWander({ pokemon })
                 );
             } else {
                 App.game.logbook.newLog(
                     LogBookTypes.WANDER,
-                    createLogContent.wildWander({ pokemon : wanderer.name })
+                    createLogContent.wildWander({ pokemon })
                 );
             }
+
+            // Gain Pokemon
+            App.game.party.gainPokemonByName(wanderPokemon, shiny, true);
+            const partyPokemon = App.game.party.getPokemon(PokemonHelper.getPokemonByName(wanderPokemon).id);
+            partyPokemon.effortPoints += App.game.party.calculateEffortPoints(partyPokemon, shiny, GameConstants.ShadowStatus.None, GameConstants.WANDERER_EP_YIELD, Berry.baseWander.includes(wanderPokemon));
+
             // Check for Starf berry generation
-            if (wanderer.shiny) {
+            if (shiny) {
                 const emptyPlots = App.game.farming.plotList.filter(plot => plot.isUnlocked && plot.isEmpty());
                 // No Starf generation if no empty plots :(
                 if (emptyPlots.length) {
@@ -456,7 +449,7 @@ class Plot implements Saveable {
                 }
             }
 
-            return wanderer;
+            return {pokemon: wanderPokemon, shiny: shiny};
         }
         return undefined;
     }
@@ -566,7 +559,6 @@ class Plot implements Saveable {
         this.mulchTimeLeft = json.mulchTimeLeft ?? this.defaults.mulchTimeLeft;
         this.lastPlanted = json.lastPlanted ?? json.berry ?? this.defaults.berry;
         this.isSafeLocked = json.isSafeLocked ?? this.defaults.isSafeLocked;
-        this.wanderer = WandererPokemon.fromJSON(json.wanderer);
     }
 
     toJSON(): Record<string, any> {
@@ -578,7 +570,6 @@ class Plot implements Saveable {
             mulch: this.mulch,
             mulchTimeLeft: this.mulchTimeLeft,
             isSafeLocked: this.isSafeLocked,
-            wanderer: this.wanderer?.toJSON(),
         };
     }
 
@@ -610,10 +601,6 @@ class Plot implements Saveable {
 
     public neighbours(): Plot[] {
         return Plot.findNearPlots(this.index).map(i => App.game.farming.plotList[i]);
-    }
-
-    public canCatchWanderer(): boolean {
-        return this.wanderer && !this.wanderer.catching() && !this.wanderer.fleeing();
     }
 
     /**
@@ -690,14 +677,6 @@ class Plot implements Saveable {
 
     set mulchTimeLeft(value: number) {
         this._mulchTimeLeft(value);
-    }
-
-    get wanderer(): WandererPokemon {
-        return this._wanderer();
-    }
-
-    set wanderer(wanderer: WandererPokemon) {
-        this._wanderer(wanderer);
     }
 
 }

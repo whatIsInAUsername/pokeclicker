@@ -47,7 +47,7 @@ export default class Translate {
             .use(Backend)
             .use(LanguageDetector)
             .init({
-                debug: GameHelper.isDevelopmentBuild(),
+                debug: true,
                 ns: ['pokemon', 'logbook', 'settings'],
                 fallbackLng: 'en',
                 backend: {

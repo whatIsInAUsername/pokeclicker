@@ -3,7 +3,7 @@ class Pokeball {
 
     constructor(
         public type: GameConstants.Pokeball,
-        public catchBonus: (opts: CatchOptions) => number,
+        public catchBonus: () => number,
         public catchTime: number,
         public description: string,
         public unlockRequirement: Requirement | MultiRequirement = new MultiRequirement(),

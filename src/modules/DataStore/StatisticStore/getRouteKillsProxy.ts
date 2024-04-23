@@ -1,5 +1,4 @@
-import type { Observable } from 'knockout';
-import '../../koExtenders';
+import { Observable } from 'knockout';
 import * as GameConstants from '../../GameConstants';
 
 const failedSetValue = () => 0;

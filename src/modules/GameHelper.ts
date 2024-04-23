@@ -8,15 +8,10 @@ import {
 export default class GameHelper {
     public static counter = 0;
     public static currentTime: KnockoutObservable<Date> = ko.observable(new Date());
-    public static today: KnockoutObservable<Date> = ko.observable(GameHelper.getToday());
-    public static tomorrow: KnockoutComputed<Date> = ko.pureComputed<Date>(() => {
-        const tomorrow = new Date(GameHelper.today());
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow;
-    });
+    public static tomorrow: Date = GameHelper.getTomorrow();
 
     public static msUntilTomorrow: KnockoutComputed<number>
-    = ko.pureComputed<number>(() => Number(GameHelper.tomorrow()) - Number(GameHelper.currentTime()));
+    = ko.pureComputed<number>(() => Number(GameHelper.tomorrow) - Number(GameHelper.currentTime()));
 
     public static formattedTimeUntilTomorrow: KnockoutComputed<string>
     = ko.pureComputed<string>(() => {
@@ -72,14 +67,15 @@ export default class GameHelper {
 
     public static tick(): void {
         this.counter = 0;
-        GameHelper.currentTime(new Date());
+        this.updateTime();
     }
 
-    public static updateDay(): void {
+    public static updateTime(): void {
         const now = new Date();
-        if (now.getDate() !== GameHelper.today().getDate()) {
-            GameHelper.today(GameHelper.getToday());
+        if (now.getDate() === GameHelper.tomorrow.getDate()) {
+            GameHelper.tomorrow = GameHelper.getTomorrow();
         }
+        GameHelper.currentTime(new Date());
     }
 
     public static formatAmount(n: number): string {
@@ -168,13 +164,14 @@ export default class GameHelper {
         return (`0${n}`).slice(-2);
     }
 
-    private static getToday() {
-        const today = new Date();
-        today.setHours(0);
-        today.setMinutes(0);
-        today.setSeconds(0);
-        today.setMilliseconds(0);
-        return today;
+    private static getTomorrow() {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0);
+        tomorrow.setMinutes(0);
+        tomorrow.setSeconds(0);
+        tomorrow.setMilliseconds(0);
+        return tomorrow;
     }
 
     // Check if HTML container with the given ID is overflowing horizontally
@@ -211,20 +208,5 @@ export default class GameHelper {
             hash |= 0; // Convert to 32bit integer
         }
         return hash;
-    }
-
-    public static isColorLight(color: string): boolean {
-        const r = parseInt(color.substring(1, 3), 16), g = parseInt(color.substring(3, 5), 16), b = parseInt(color.substring(5), 16);
-        const grey = r * 0.299 + g * 0.587 + b * 0.114; // Range between 0 and 255, based on NTSC formula.
-        return grey > 127;
-    }
-
-    public static isDevelopmentBuild(): boolean {
-        // This was done like this so es/tslint doesn't throw errors
-        try {
-            return !!JSON.parse('$DEVELOPMENT');
-        } catch (e) {
-            return false;
-        }
     }
 }

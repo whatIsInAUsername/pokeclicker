@@ -23,8 +23,4 @@ export default class ContestWonRequirement extends AchievementRequirement {
     public hint(): string {
         return `You need to complete atleast ${this.requiredValue} Contests with result ${GameConstants.ContestResults[this.resultRequired]} or higher.`;
     }
-
-    public toString(): string {
-        return `${super.toString()} ${this.resultRequired}`;
-    }
 }

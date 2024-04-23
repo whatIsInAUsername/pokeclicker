@@ -12,13 +12,13 @@ class PurifyChamberTownContent extends TownContent {
         $('#purifyChamberModal').modal('show');
     }
 
-    public isUnlocked(): boolean {
-        return PurifyChamber.requirements.isCompleted();
-    }
-
     public areaStatus(): areaStatus {
-        const canPurify = App.game.purifyChamber.currentFlow() >= App.game.purifyChamber.flowNeeded() && App.game.party.caughtPokemon.some(p => p.shadow == GameConstants.ShadowStatus.Shadow);
-        return Math.min(canPurify ? areaStatus.uncaughtPokemon : areaStatus.completed, super.areaStatus());
+        if (!PurifyChamber.requirements.isCompleted()) {
+            return super.areaStatus();
+        }
+        if (App.game.purifyChamber.currentFlow() >= App.game.purifyChamber.flowNeeded() && App.game.party.caughtPokemon.some(p => p.shadow == GameConstants.ShadowStatus.Shadow)) {
+            return areaStatus.uncaughtPokemon;
+        }
     }
 
 }
@@ -29,16 +29,15 @@ class PurifyChamber implements Saveable {
     public selectedPokemon: KnockoutObservable<PartyPokemon>;
     public currentFlow: KnockoutObservable<number>;
     public flowNeeded: KnockoutComputed<number>;
-    private notified = false;
 
     constructor() {
         this.selectedPokemon = ko.observable(undefined);
         this.currentFlow = ko.observable(0);
         this.flowNeeded = ko.pureComputed(() => {
             const purifiedPokemon = App.game.party.caughtPokemon.filter((p) => p.shadow == GameConstants.ShadowStatus.Purified).length;
-            const flow = 15 * purifiedPokemon * purifiedPokemon +
-                15 * purifiedPokemon +
-                1500 * Math.exp(0.1 * purifiedPokemon);
+            const flow = 10 * purifiedPokemon * purifiedPokemon +
+                10 * purifiedPokemon +
+                1000 * Math.exp(0.1 * purifiedPokemon);
             return Math.round(flow);
         });
     }
@@ -62,26 +61,14 @@ class PurifyChamber implements Saveable {
         }
         this.selectedPokemon().shadow = GameConstants.ShadowStatus.Purified;
         this.currentFlow(0);
-        this.notified = false;
     }
 
     public gainFlow(exp: number) {
-        if (!PurifyChamber.requirements.isCompleted() || !App.game.party.hasShadowPokemon()) {
+        if (!PurifyChamber.requirements.isCompleted() || !App.game.party.caughtPokemon.some((p) => p.shadow == GameConstants.ShadowStatus.Shadow)) {
             return;
         }
         const newFlow = Math.round(this.currentFlow() + exp / 1000);
         this.currentFlow(Math.min(newFlow, this.flowNeeded()));
-
-        if (!this.notified && this.currentFlow() >= this.flowNeeded()) {
-            this.notified = true;
-            Notifier.notify({
-                title: 'Purify Chamber',
-                message: 'Maximum Flow has accumulated at the Purify Chamber in Orre!',
-                type: NotificationConstants.NotificationOption.primary,
-                sound: NotificationConstants.NotificationSound.General.max_flow,
-                timeout: 15 * GameConstants.MINUTE,
-            });
-        }
     }
 
     saveKey = 'PurifyChamber';

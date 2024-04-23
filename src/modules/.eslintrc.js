@@ -18,6 +18,7 @@ module.exports = {
     globals: {
         ko: 'readonly',
         $: 'readonly',
+        gtag: 'readonly',
         App: 'readonly',
         player: 'readonly',
         Save: 'readonly',

@@ -1,16 +1,18 @@
 class DefeatDungeonBossQuest extends Quest implements QuestInterface {
+    customReward?: () => void;
 
-    constructor(public dungeon: string, public dungeonBoss : PokemonNameType | string, reward = 0) {
-        super(1, reward);
-        const region = GameConstants.getDungeonRegion(this.dungeon);
-        if (region == GameConstants.Region.none) {
-            throw new Error(`Invalid dungeon for quest: ${this.dungeon}`);
-        }
+    constructor(public dungeon: string, public dungeonBoss : PokemonNameType | string, reward: (() => void) | number = 0, description?: string, onLoad?: (() => void)) {
+        const qpReward = typeof reward == 'number' ? reward : 0;
+        super(1, qpReward);
+        this.customDescription = description ?? `Defeat ${this.dungeonBoss} in ${this.dungeon}.`;
+        this.customReward = typeof reward == 'function' ? reward : undefined;
+        this._onLoad = typeof onLoad == 'function' ? onLoad : undefined;
         this.focus = ko.observable(0);
     }
 
-    get description() {
-        return this.customDescription ?? `Defeat ${this.dungeonBoss} in ${this.dungeon}.`;
+    begin() {
+        this.onLoad();
+        super.begin();
     }
 
     onLoad() {
@@ -22,5 +24,12 @@ class DefeatDungeonBossQuest extends Quest implements QuestInterface {
             () =>  DungeonRunner.defeatedBoss() === this.dungeonBoss && DungeonRunner.dungeon?.name === this.dungeon,
             () => this.focus(1)
         );
+    }
+
+    claim(): boolean {
+        if (this.customReward !== undefined) {
+            this.customReward();
+        }
+        return super.claim();
     }
 }

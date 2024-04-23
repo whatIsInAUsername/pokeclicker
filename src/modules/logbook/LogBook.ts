@@ -1,6 +1,5 @@
 /* eslint-disable class-methods-use-this */
-import type { Observable, ObservableArray, PureComputed } from 'knockout';
-import '../koExtenders';
+import { Observable, ObservableArray, PureComputed } from 'knockout';
 import { Feature } from '../DataStore/common/Feature';
 import { LogContent } from './helpers';
 import LogBookLog from './LogBookLog';

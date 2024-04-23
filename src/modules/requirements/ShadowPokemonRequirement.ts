@@ -18,8 +18,4 @@ export default class ShadowPokemonRequirement extends AchievementRequirement {
                 return `${this.requiredValue} Shadow Pokémon need to be purified.`;
         }
     }
-
-    public toString(): string {
-        return `${super.toString()} ${this.status}`;
-    }
 }

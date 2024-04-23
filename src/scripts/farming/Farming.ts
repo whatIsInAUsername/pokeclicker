@@ -581,7 +581,7 @@ class Farming implements Feature {
             BerryColor.Pink,
             25,
             BerryFirmness.Soft,
-            ['A bounty of nature that is exceedingly sweet. The Berry is huge, with some discovered that exceed 20\u2033, or 50 cm.']
+            ['A bounty of nature that is exceedingly sweet. The Berry is huge, with some discovered that exceed 20 inches.']
         );
 
         this.berryData[BerryType.Durin] = new Berry(
@@ -621,7 +621,7 @@ class Farming implements Feature {
             0.1,
             2500,
             15,
-            [0, 0, 35, 0, 0],
+            [0, 0, 50, 0, 0],
             30,
             BerryColor.Pink,
             3.5,
@@ -911,7 +911,7 @@ class Farming implements Feature {
                 'This Berry requires a lot of energy to grow, but isn\'t fussy about what it consumes, it helps other plants by removing toxins from the soil.',
             ],
             new Aura(AuraType.Decay, [0.8, 0.6, 0.5]),
-            ['Dratini', 'Bagon', 'Gible', 'Druddigon', 'Drampa', 'Applin', 'Exposed Applin']
+            ['Dratini', 'Bagon', 'Gible', 'Druddigon', 'Drampa', 'Applin']
         );
 
         this.berryData[BerryType.Colbur] = new Berry(
@@ -1734,6 +1734,9 @@ class Farming implements Feature {
             }));
 
         //#endregion
+
+        //#endregion
+
     }
 
     getGrowthMultiplier(): number {
@@ -1787,16 +1790,15 @@ class Farming implements Feature {
 
         // Wandering Pokemon
         this.wanderCounter += GameConstants.TICK_TIME;
-        let wanderPokemon: WandererPokemon;
-        const wanderList: WandererPokemon[] = [];
+        let wanderPokemon: any;
         if (this.wanderCounter >= GameConstants.WANDER_TICK) {
             for (let i = 0; i < App.game.farming.plotList.length; i++) {
                 const plot = App.game.farming.plotList[i];
-                // generate or get rid of a wanderer
                 wanderPokemon = plot.generateWanderPokemon();
-                if (wanderPokemon) {
-                    wanderList.push(wanderPokemon);
+                if (wanderPokemon !== undefined) {
+                    // TODO: HLXII Handle other bonus (DT?)
                     notifications.add(FarmNotificationType.Wander);
+                    break;
                 }
             }
             this.wanderCounter = 0;
@@ -1804,13 +1806,13 @@ class Farming implements Feature {
         }
 
         if (notifications.size) {
-            notifications.forEach((n) => this.handleNotification(n, wanderList));
+            notifications.forEach((n) => this.handleNotification(n, wanderPokemon));
         }
 
         this.farmHands.tick();
     }
 
-    handleNotification(farmNotiType: FarmNotificationType, wanderList?: WandererPokemon[]): void {
+    handleNotification(farmNotiType: FarmNotificationType, wander?: any): void {
         let message = '';
         let image = null;
         let type = NotificationConstants.NotificationOption.success;
@@ -1855,12 +1857,10 @@ class Farming implements Feature {
                 setting = NotificationConstants.NotificationSetting.Farming.mulch_ran_out;
                 break;
             case FarmNotificationType.Wander:
-                // Only notify for one wanderer, randomly picked, shiny priorized; there will rarely be more than one
-                const shinyList = wanderList.filter(w => w.shiny);
-                const displayWanderer = shinyList.length ? Rand.fromArray(shinyList) : Rand.fromArray(wanderList);
-                message = `A wild ${displayWanderer.name} has wandered onto the farm!`;
-                image = PokemonHelper.getImage(PokemonHelper.getPokemonByName(displayWanderer.name).id, displayWanderer.shiny);
-                type = displayWanderer.shiny ? NotificationConstants.NotificationOption.warning : NotificationConstants.NotificationOption.success;
+                const pokemon = wander?.shiny ? `shiny ${wander?.pokemon}` : wander?.pokemon;
+                message = `A wild ${pokemon} has wandered onto the farm!`;
+                image = PokemonHelper.getImage(PokemonHelper.getPokemonByName(wander?.pokemon).id, wander?.shiny);
+                type = wander?.shiny ? NotificationConstants.NotificationOption.warning : NotificationConstants.NotificationOption.success;
                 sound = NotificationConstants.NotificationSound.Farming.wandering_pokemon;
                 setting = NotificationConstants.NotificationSetting.Farming.wandering_pokemon;
                 break;
@@ -2260,81 +2260,10 @@ class Farming implements Feature {
 
     public auraDisplay(berry: BerryType, stage: number) {
         if (App.game.farming.berryData[berry].aura.auraType === AuraType.Repel) { // add other additive auras here with ||
-            return `+${App.game.farming.berryData[berry].aura.auraMultipliers[stage].toLocaleString('en-US', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            return `+${GameConstants.formatNumber(App.game.farming.berryData[berry].aura.auraMultipliers[stage] * 100)}%`;
         } else {
-            return `×${App.game.farming.berryData[berry].aura.auraMultipliers[stage].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            return `×${GameConstants.formatNumber(App.game.farming.berryData[berry].aura.auraMultipliers[stage])}`;
         }
-    }
-
-    public handleWanderer(plot: Plot) {
-        if (!plot.canCatchWanderer()) {
-            return;
-        }
-        const wanderer = plot.wanderer;
-        const pokemonData = PokemonHelper.getPokemonByName(wanderer.name);
-        const berry = App.game.farming.berryData[plot.wanderer.berry];
-
-        const farmPoints = Math.floor(berry.farmValue / (4 + berry.growthTime[PlotStage.Bloom] / 1800));
-        App.game.wallet.gainFarmPoints(farmPoints);
-
-        const pokeball = App.game.pokeballs.calculatePokeballToUse(pokemonData.id, wanderer.shiny, false, EncounterType.wanderer);
-        if (pokeball !== GameConstants.Pokeball.None) {
-            wanderer.pokeball(pokeball);
-            wanderer.catching(true);
-            // Halved catch time in farm, it does not matter in the balance
-            setTimeout(() => this.attemptCatchWanderer(plot), App.game.pokeballs.calculateCatchTime(pokeball) / 2);
-        } else {
-            this.wandererIsFleeing(plot);
-        }
-
-    }
-
-    public attemptCatchWanderer(plot: Plot) {
-        const wanderer = plot.wanderer;
-        App.game.pokeballs.usePokeball(wanderer.pokeball());
-        const catchChance = GameConstants.clipNumber(
-            wanderer.catchRate
-                + App.game.pokeballs.getCatchBonus(wanderer.pokeball(), { pokemon: wanderer.name, encounterType: EncounterType.wanderer })
-                + App.game.oakItems.calculateBonus(OakItemType.Magic_Ball)
-                + (plot.mulch === MulchType.Gooey_Mulch ? GameConstants.GOOEY_MULCH_CATCH_BONUS : 0),
-            0, 100);
-        if (Rand.chance(catchChance / 100)) { // Successfully caught
-            App.game.oakItems.use(OakItemType.Magic_Ball);
-            App.game.party.gainPokemonByName(wanderer.name, wanderer.shiny);
-            const partyPokemon = App.game.party.getPokemonByName(wanderer.name);
-            const wandererEPGain = App.game.pokeballs.getEPBonus(wanderer.pokeball())
-                * GameConstants.BASE_EP_YIELD
-                * (Berry.isBaseWanderer(wanderer.name) ? GameConstants.BASE_WANDERER_EP_MODIFIER : GameConstants.WANDERER_EP_MODIFIER);
-            partyPokemon.effortPoints += App.game.party.calculateEffortPoints(partyPokemon, wanderer.shiny, undefined, wandererEPGain);
-            const fakedRoute = FarmController.wandererToRoute(wanderer.name);
-            Battle.gainTokens(fakedRoute.number, fakedRoute.region, wanderer.pokeball());
-            plot.wanderer = undefined;
-            return;
-        } else if (wanderer.shiny) { // Failed to catch, Shiny
-            App.game.logbook.newLog(
-                LogBookTypes.ESCAPED,
-                App.game.party.alreadyCaughtPokemonByName(wanderer.name, true)
-                    ? createLogContent.escapedShinyDupe({ pokemon: wanderer.name })
-                    : createLogContent.escapedShiny({ pokemon: wanderer.name })
-            );
-        } else if (!App.game.party.alreadyCaughtPokemonByName(wanderer.name)) { // Failed to catch, Uncaught
-            App.game.logbook.newLog(
-                LogBookTypes.ESCAPED,
-                createLogContent.escapedWild({ pokemon: wanderer.name})
-            );
-        }
-        plot.wanderer.catching(false);
-        this.wandererIsFleeing(plot);
-    }
-
-    public wandererIsFleeing(plot: Plot) {
-        if (!plot.wanderer) {
-            return;
-        }
-        plot.wanderer.fleeing(true);
-        setTimeout(() => {
-            plot.wanderer = undefined;
-        }, 250);
     }
 
 }

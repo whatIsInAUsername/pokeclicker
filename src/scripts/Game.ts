@@ -84,8 +84,6 @@ class Game {
         EffectEngineRunner.initialize(this.multiplier, GameHelper.enumStrings(GameConstants.BattleItemType).map((name) => ItemList[name]));
         FluteEffectRunner.initialize(this.multiplier);
         ItemHandler.initilizeEvoStones();
-        BreedingController.initialize();
-        PokedexHelper.initialize();
         this.profile.initialize();
         this.breeding.initialize();
         this.pokeballs.initialize();
@@ -116,7 +114,7 @@ class Game {
         DailyDeal.generateDeals(this.underground.getDailyDealsMax(), now);
         BerryDeal.generateDeals(now);
         Weather.generateWeather(now);
-        GemDeals.generateDeals();
+        GemDeal.generateDeals();
         ShardDeal.generateDeals();
         SafariPokemonList.generateSafariLists();
         RoamingPokemonList.generateIncreasedChanceRoutes(now);
@@ -127,15 +125,6 @@ class Game {
             this.computeOfflineEarnings();
         }
         this.checkAndFix();
-
-        if (Settings.getSetting('disableAutoSave').value === true) {
-            Notifier.notify({
-                type: NotificationConstants.NotificationOption.danger,
-                title: 'Auto Save Disabled',
-                message: 'You have disabled auto saving! Be sure to manually save before exiting or any progress will be lost!',
-                timeout: 5 * GameConstants.MINUTE,
-            });
-        }
 
         // If the player isn't on a route, they're in a town/dungeon
         this.gameState = player.route() ? GameConstants.GameState.fighting : GameConstants.GameState.town;
@@ -440,8 +429,6 @@ class Game {
                     player._timeTraveller = true;
                 }
 
-                GameHelper.updateDay();
-
                 SeededDateRand.seedWithDate(now);
                 // Give the player a free quest refresh
                 this.quests.freeRefresh(true);
@@ -464,6 +451,8 @@ class Game {
                 // Refresh Friend Safari Pokemon List
                 SafariPokemonList.generateKalosSafariList();
 
+                DayOfWeekRequirement.date(now.getDay());
+
                 // Reset some temporary battles
                 Object.values(TemporaryBattleList).forEach(t => {
                     if (t.optionalArgs?.resetDaily) {
@@ -482,7 +471,6 @@ class Game {
                 }
             }
 
-            player._lastSeen = Date.now();
             this.save();
         }
 
@@ -537,9 +525,8 @@ class Game {
     }
 
     save() {
-        if (Settings.getSetting('disableAutoSave').value === false) {
-            Save.store(player);
-        }
+        player._lastSeen = Date.now();
+        Save.store(player);
     }
 
     // Knockout getters/setters
